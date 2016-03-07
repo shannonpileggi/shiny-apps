@@ -4,66 +4,55 @@ shinyServer(function(input, output, session) {
   
   # Reactive expression for the data subsetted to what the user selected
   filteredData <- reactive({
-    quakes[quakes$mag >= input$range[1] & quakes$mag <= input$range[2],]
+    quakes[quakes$lat > input$map_bounds$south & quakes$lat < input$map_bounds$north
+          & quakes$long > input$map_bounds$west & quakes$long < input$map_bounds$east, ]
   })
   
-  # Get a single sample from the earthquake data
-  sampledData <- reactive({
-    filteredData()[sample(1:dim(filteredData())[1], input$sample_size, replace = TRUE), ]
-  })
-  
-  # This reactive expression represents the palette function,
-  # which changes as the user makes selections in UI.
-  colorpal <- reactive({
-    colorNumeric(input$colors, quakes$mag)
+  # Draw Samples
+  drawSamples <- reactive({
+    input$redraw_sample
+    N <- isolate(input$n_samples)
+    n <- isolate(input$sample_size)
+    quakesf <- filteredData()$mag
+    matrix(quakesf[sample(length(quakesf), N * n, replace = TRUE)], nrow = N, ncol = n)
   })
   
   output$map <- renderLeaflet({
     # Use leaflet() here, and only include aspects of the map that
     # won't need to change dynamically (at least, not unless the
     # entire map is being torn down and recreated).
-    leaflet(quakes) %>% addTiles() 
+    leaflet(quakes) %>% 
+        addTiles() %>%
+        addCircles(radius = ~10^mag, weight = 1, color = "#777777",
+                    fillColor = "firebrick", fillOpacity = 0.7, 
+                    popup = ~paste0(date, "</br> Magnitude = ", mag)) %>%
+        setView(lng = -90, lat = 38.88, zoom = 3)
   })
   
-  output$histogram1 <- renderPlot({
-    hist(filteredData()$mag, main = "Earthquakes (filtered)", xlab = "Magnitude")
+  output$histogram1 <- renderPlotly({
+    n <- dim(filteredData())[1]
+    N <- dim(quakes)[1]
+    plot_ly(x = filteredData()$mag, type = "histogram") %>%
+      layout(title = paste0(n, " / ", N, " (", floor(100*(n/N)), "%)"), 
+             xaxis = list(title = "Magnitude"))
   })
   
-  output$histogram2 <- renderPlot({
-    hist(quakes$mag, main = "Earthquakes", xlab = "Magnitude")
+  output$histogram2 <- renderPlotly({
+    plot_ly(x = drawSamples()[1, ], opacity = 0.6, type = "histogram", group = "Sample 1") %>%
+      add_trace(x = drawSamples()[2, ], visible = "legendonly", group = "Sample 2") %>%
+      add_trace(x = drawSamples()[3, ], visible = "legendonly", group = "Sample 3") %>%
+      add_trace(x = drawSamples()[4, ], visible = "legendonly", group = "Sample 4") %>%
+      add_trace(x = drawSamples()[5, ], visible = "legendonly", group = "Sample 5") %>%
+      layout(barmode="overlay", 
+              xaxis = list(title = "Magnitude", 
+                           range = range(filteredData()$mag)))
   })
   
-  output$histogram3 <- renderPlot({
-    hist(sampledData()$mag, main = "Most Recent Sample", xlab = "Magnitude")
+  output$histogram3 <- renderPlotly({
+    plot_ly(x = apply(drawSamples(), 1, mean), type = "histogram") %>%
+      layout(xaxis = list(title = "Average Magnitude",
+                          range = range(filteredData()$mag)))
   })
   
-  # Incremental changes to the map (in this case, replacing the
-  # circles when a new color is chosen) should be performed in
-  # an observer. Each independent set of things that can change
-  # should be managed in its own observer.
-  observe({
-    pal <- colorpal()
-    
-    leafletProxy("map", data = filteredData()) %>%
-      clearShapes() %>%
-      addCircles(radius = ~10^mag/10, weight = 1, color = "#777777",
-        fillColor = ~pal(mag), fillOpacity = 0.7, popup = ~paste(mag)
-      )
-  })
-  
-  # Use a separate observer to recreate the legend as needed.
-  observe({
-    proxy <- leafletProxy("map", data = quakes)
-    
-    # Remove any existing legend, and only if the legend is
-    # enabled, create a new one.
-    proxy %>% clearControls()
-    if (input$legend) {
-      pal <- colorpal()
-      proxy %>% addLegend(position = "bottomright",
-        pal = pal, values = ~mag
-      )
-    }
-  })
 })
 
