@@ -8,12 +8,8 @@ install.packages(leaflet)
 install.packages(plotly)
 ```
 
-To run this app directly from github, use the `devtools` packages:
+You can run this app directly from github:
 ```r
-# Install/Load devtools
-install.packages(devtools)
-library(devtools)
-
 # Run sampling-app
 shiny::runGitHub(repo = "shiny-apps", username = "anthonypileggi", subdir = "sampling-app")
 ```
