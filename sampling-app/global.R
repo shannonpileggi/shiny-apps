@@ -1,7 +1,6 @@
 library(shiny)
 library(shinydashboard)
 library(leaflet)
-library(RColorBrewer)
 library(plotly)
 
 quakes <- read.csv(file = "/Users/anthony/Documents/shiny-apps/sampling-app/earthquakes_feb16.csv")
